@@ -18,6 +18,13 @@ For localhost the pgadmin4 is bundled in the docker compose file and can be acce
 For pgadmin the default user=a@a.org and password=pass
 For the database the user=postgres, password=pass and the postgres database=todos
 
+Commands:
+- d-up: Create and initialze database
+- d-down: Tear down and remove all docker containers
+- d-start: Start a stopped system
+- d-stop: Stop the system
+- dps: Equal to "docker ps -a"
+
 Environment variables if you want to change the default:
 - POSTGRES_USER
 - POSTGRES_PASSWORD
