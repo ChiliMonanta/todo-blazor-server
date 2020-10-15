@@ -1,0 +1,176 @@
+﻿@page "/todolist/{todoListId:long}"
+
+@using NHibernate.Linq;
+@inject ITodoService TodoService
+@inject NavigationManager NavigationManager
+
+<h1>Todos on list @(todoList?.name ?? "n/a")</h1>
+
+@if (showEditDialog)
+{
+<div class="modal fade show" tabindex="-1" role="dialog" style="display: block;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Todo</h5>
+            </div>
+            <div class="modal-body">
+                <p><input type="text" width="10" placeholder="Name" @bind-value="editTodo.name"/></p>
+                <p><input type="text" width="10" placeholder="Description" @bind-value="editTodo.description"/></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" @onclick="@(() => { UpdateTodo(editTodo); })">Save changes</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal"  @onclick="@(() => { showEditDialog = false; })">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-backdrop fade show"></div>
+}
+
+@if (showMoveDialog)
+{
+<div class="modal fade show" tabindex="-1" role="dialog" style="display: block;">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Move Todo to another Todo list</h5>
+            </div>
+            <div class="modal-body">
+                @if (allTodoLists == null || allTodoLists.Count == 0) {
+                    <p><em>No todos!</em></p>
+                } else {
+                    <select class="form-control" @onchange="@( (ChangeEventArgs e) => selectedTodoListMoveChanged(e) )">
+                        <option value="0">--- Select Todo List ---</option>
+                        @foreach (var item in allTodoLists.Where( t => t.id != todoList.id))
+                        {
+                            <option value="@item.id">@item.name</option>
+                        }
+                    </select>
+                }
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" @onclick="@(() => { MoveTodo(editTodo, selectedTodoListMove); })" disabled="@(selectedTodoListMove == null)">Save changes</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" @onclick="@(() => { showMoveDialog = false; })">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="modal-backdrop fade show"></div>
+}
+
+<p>
+    <input @bind-value="nameOfTodoToAdd" type="text" width="10" placeholder="Name of todo" />
+    <input @bind-value="descriptionOfTodoToAdd" type="text" width="10" placeholder="Description" />
+    <button class="btn btn-primary" @onclick="(() => AddTodo())">Create</button>
+</p>
+@if (todos.Count == 0)
+{
+    <p><em>No todos!</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>id</th>
+                <th>Name</th>
+                <th>Description</th>
+                <th></th>
+                <th></th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var todo in todos)
+            {
+                <tr>
+                    <td>@todo.id</td>
+                    <td>@todo.name</td>
+                    <td>@todo.description</td>
+                    <td>
+                        <button class="btn btn-primary" @onclick="(async () => { editTodo = TodoItem.from(todo); showEditDialog = true; })">Edit</button>
+                        <button class="btn btn-primary" @onclick="(async () => { selectedTodoListMove = null; editTodo = todo; showMoveDialog = true; })">move</button>
+                        <button class="btn btn-danger" @onclick="(async () => RemoveTodo(todo))">Remove</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter]
+    public long todoListId { get; set; }
+    bool showEditDialog = false;
+    bool showMoveDialog = false;
+    private TodoList todoList;
+    private IList<TodoList> allTodoLists;
+    private IList<TodoItem> todos = new List<TodoItem>();
+    private String nameOfTodoToAdd;
+    private String descriptionOfTodoToAdd;
+    private TodoItem editTodo;
+    private TodoList selectedTodoListMove = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        todoList = await TodoService.GetTodoList(todoListId);
+        todos = todoList.todoItems;
+        allTodoLists = await TodoService.TodoLists.ToListAsync();
+    }
+
+    private void selectedTodoListMoveChanged(ChangeEventArgs e)
+    {
+        var id = long.Parse(e.Value.ToString());
+        selectedTodoListMove = allTodoLists.FirstOrDefault(x => x.id == id);
+    }
+
+    private async void RemoveTodo(TodoItem todo)
+    {
+        using (var tx = TodoService.BeginTransaction())
+        {
+            await TodoService.DeleteTodoAsync(todo);
+            await tx.CommitAsync();
+        }
+        todos.Remove(todo);
+        StateHasChanged();
+    }
+
+    private async void AddTodo()
+    {
+        TodoItem todo = new TodoItem() { name = nameOfTodoToAdd, description = descriptionOfTodoToAdd, todoList = todoList };
+        await SaveTodo(todo);
+        todos.Insert(0, todo);
+        nameOfTodoToAdd = "";
+        descriptionOfTodoToAdd = "";
+        StateHasChanged();
+    }
+
+    private async void UpdateTodo(TodoItem updatedTodo)
+    {
+        var origin = todos.Where(t => t.id == updatedTodo.id).First();
+        origin.name = updatedTodo.name;
+        origin.description = updatedTodo.description;
+        await SaveTodo(origin);
+        showEditDialog = false;
+        StateHasChanged();
+    }
+
+    private async void MoveTodo(TodoItem todo, TodoList selectedTodoList)
+    {
+        todo.todoList = selectedTodoList;
+        await SaveTodo(todo);
+        showMoveDialog = false;
+        todos.Remove(todo);
+        StateHasChanged();
+    }
+
+    private async Task SaveTodo(TodoItem todo)
+    {
+        using (var tx = TodoService.BeginTransaction())
+        {
+            await TodoService.SaveTodoAsync(todo);
+            await tx.CommitAsync();
+        };
+    }
+}

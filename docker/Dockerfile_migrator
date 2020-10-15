@@ -1,0 +1,7 @@
+FROM mcr.microsoft.com/dotnet/core/sdk:3.1
+WORKDIR /build
+COPY db-migrator .
+RUN dotnet build
+RUN dotnet publish -o /publish 
+WORKDIR /publish
+CMD ["sh", "-c", "dotnet task-migrator.dll"]

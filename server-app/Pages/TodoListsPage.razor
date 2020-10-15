@@ -1,0 +1,92 @@
+﻿@page "/todolists"
+
+@using NHibernate.Linq;
+@inject ITodoService TodoService
+@inject NavigationManager NavigationManager
+
+<h1>Todos</h1>
+
+<p>A list of all todos.</p>
+<p>
+    <input @bind-value="nameOfTodolistToAdd" type="text" width="10" @onkeyup="(e => KeyUp(e))" placeholder="Name of todo list" />
+    <button class="btn btn-primary" @onclick="(() => AddTodoList(nameOfTodolistToAdd))">Add</button>
+</p>
+@if (todoLists == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>id</th>
+                <th>Name</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var todoList in todoLists)
+            {
+                var listLink = $"todolist/{todoList.id}";
+                <tr>
+                    <td>@todoList.id</td>
+                    <td>
+                        <NavLink class="nav-link" href="@listLink">@todoList.name</NavLink>
+                    </td>
+                    <td><button class="btn btn-danger" @onclick="(() => RemoveTodoList(todoList))">Remove</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<TodoList> todoLists;
+    private String nameOfTodolistToAdd;
+
+    protected override async Task OnInitializedAsync()
+    {
+        todoLists = await TodoService.TodoLists.ToListAsync();
+    }
+
+    void KeyUp(KeyboardEventArgs eventArgs)
+    {
+        if (eventArgs.Key == "Enter")
+        {
+            AddTodoList(nameOfTodolistToAdd);
+        }
+    }
+
+    private async void RemoveTodoList(TodoList todo)
+    {
+        Console.WriteLine($"Removed {todo.id}");
+        using (var tx = TodoService.BeginTransaction())
+        {
+            await TodoService.DeleteTodoListAsync(todo);
+            await tx.CommitAsync();
+        };
+        todoLists.Remove(todo);
+        StateHasChanged();
+    }
+
+    private async void AddTodoList(String name)
+    {
+        try
+        {
+            TodoList todo = new TodoList() { name = name };
+            using (var tx = TodoService.BeginTransaction())
+            {
+                await TodoService.SaveTodoListAsync(todo);
+                await tx.CommitAsync();
+            };
+            todoLists.Insert(0, todo);
+            nameOfTodolistToAdd = "";
+            StateHasChanged();
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+}
