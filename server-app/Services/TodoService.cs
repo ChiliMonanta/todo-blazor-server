@@ -1,14 +1,17 @@
 using System.Linq;
 using System.Threading.Tasks;
 using NHibernate;
+using Microsoft.Extensions.Logging;
 
 public class TodoService : ITodoService
 {
     private readonly ISession session;
+    private readonly ILogger<TodoService> logger;
  
-    public TodoService(ISession session)
+    public TodoService(ISession session, ILogger<TodoService> logger)
     {
         this.session = session;
+        this.logger = logger;
     }
  
     public IQueryable<TodoList> TodoLists =>session.Query<TodoList>().OrderBy(x => x.name);
@@ -21,6 +24,7 @@ public class TodoService : ITodoService
  
     public async Task SaveTodoListAsync(TodoList todoList)
     {
+        logger.LogTrace("Save todo");
         await session.SaveOrUpdateAsync(todoList);
     }
 

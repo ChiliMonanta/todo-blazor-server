@@ -1,6 +1,7 @@
 ﻿@page "/todolists"
 
 @using NHibernate.Linq;
+@using Serilog;
 @inject ITodoService TodoService
 @inject NavigationManager NavigationManager
 
@@ -8,7 +9,8 @@
 
 <p>A list of all todos.</p>
 <p>
-    <input @bind-value="nameOfTodolistToAdd" type="text" width="10" @onkeyup="(e => KeyUp(e))" placeholder="Name of todo list" />
+    <input @bind-value="nameOfTodolistToAdd" type="text" width="10" @onkeyup="(e => KeyUp(e))"
+placeholder="Name of todo list" />
     <button class="btn btn-primary" @onclick="(() => AddTodoList(nameOfTodolistToAdd))">Add</button>
 </p>
 @if (todoLists == null)
@@ -60,18 +62,26 @@ else
 
     private async void RemoveTodoList(TodoList todo)
     {
-        Console.WriteLine($"Removed {todo.id}");
-        using (var tx = TodoService.BeginTransaction())
+        Log.Information($"Remove todo list {todo.id}");
+        try
         {
-            await TodoService.DeleteTodoListAsync(todo);
-            await tx.CommitAsync();
-        };
-        todoLists.Remove(todo);
-        StateHasChanged();
+            using (var tx = TodoService.BeginTransaction())
+            {
+                await TodoService.DeleteTodoListAsync(todo);
+                await tx.CommitAsync();
+            };
+            todoLists.Remove(todo);
+            StateHasChanged();
+        }
+        catch (Exception e)
+        {
+            Log.Error($"Unable to remove todo list {todo.id}", e);
+        }
     }
 
     private async void AddTodoList(String name)
     {
+        Log.Information($"Add todo list {name}");
         try
         {
             TodoList todo = new TodoList() { name = name };
@@ -86,7 +96,7 @@ else
         }
         catch (Exception e)
         {
-            Console.WriteLine(e);
+            Log.Error("Unable to add todo list", e);
         }
     }
 }

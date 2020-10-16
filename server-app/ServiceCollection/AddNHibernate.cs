@@ -3,7 +3,7 @@ using FluentNHibernate.Cfg;
 using FluentNHibernate.Cfg.Db;
 using NHibernate;
 using NHibernate.SqlCommand;
-using System;
+using Serilog;
 
 public static class NHibernateExtensions
 {
@@ -39,8 +39,7 @@ public static class NHibernateExtensions
     {
         public override SqlString OnPrepareStatement(SqlString sql)
         {
-            Console.WriteLine($"NHibernate: {sql}");
-
+            Log.Debug($"NHibernate Sql: {sql}");
             return base.OnPrepareStatement(sql);
         }
     }
